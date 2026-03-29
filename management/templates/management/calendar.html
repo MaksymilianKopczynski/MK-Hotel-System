@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grafik Pokoi - Recepcja</title>
+    
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar-scheduler@6.1.11/index.global.min.js'></script>
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background-color: #f4f7f6;
+        }
+        #calendar {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .fc-event {
+            cursor: pointer;
+            border: none;
+        }
+        .fc-timeline-slot-today {
+            background-color: #fffae6 !important; 
+        }
+        #jump-date {
+            padding: 6px 10px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            cursor: pointer;
+            background-color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+    <h2 style="text-align: center;">Recepcja - Grafik Pokoi</h2>
+    
+    <div id='calendar'></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var calendarEl = document.getElementById('calendar');
+
+            // CUSTOM FUNCTION: Centers the horizontal scrollbar on a specific date
+            function centerView(dateString) {
+                setTimeout(function() {
+                    // 1. Find the column header containing the date
+                    var slot = document.querySelector('th[data-date^="' + dateString + '"]');
+                    if (!slot) return;
+                    
+                    // 2. Find the main FullCalendar horizontal scroller
+                    var scrollers = document.querySelectorAll('.fc-scroller');
+                    var mainScroller = null;
+                    for (var i = 0; i < scrollers.length; i++) {
+                        if (scrollers[i].scrollWidth > scrollers[i].clientWidth) {
+                            mainScroller = scrollers[i];
+                            break;
+                        }
+                    }
+
+                    // 3. Calculate the exact pixel position to center the column
+                    if (mainScroller) {
+                        var slotRect = slot.getBoundingClientRect();
+                        var scrollerRect = mainScroller.getBoundingClientRect();
+                        
+                        var offset = (slotRect.left - scrollerRect.left) + mainScroller.scrollLeft;
+                        var centerPosition = offset - (scrollerRect.width / 2) + (slotRect.width / 2);
+
+                        // 4. Smoothly scroll to the calculated position
+                        mainScroller.scrollTo({ left: centerPosition, behavior: 'smooth' });
+                    }
+                }, 150); // Short delay to ensure calendar has fully rendered the columns
+            }
+
+
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                // DEFINING CUSTOM BUTTONS
+                customButtons: {
+                    customTodayButton: {
+                        text: 'Wróć do dzisiaj',
+                        click: function() {
+                            var today = new Date();
+                            var year = today.getFullYear();
+                            var month = String(today.getMonth() + 1).padStart(2, '0');
+                            var day = String(today.getDate()).padStart(2, '0');
+                            var dateString = year + '-' + month + '-' + day;
+
+                            // Force calendar to move to today's date
+                            calendar.gotoDate(today);
+
+                            // Update the custom date picker input
+                            var jumpDateInput = document.getElementById('jump-date');
+                            if (jumpDateInput) {
+                                jumpDateInput.value = dateString;
+                            }
+
+                            // Center the view on today's column
+                            centerView(dateString);
+                        }
+                    }
+                },
+
+                // DEFINING CUSTOM VIEWS
+                views: {
+                    symmetricTimeline: {
+                        type: 'resourceTimeline',
+                        visibleRange: function(currentDate) {
+                            // Generate a symmetric range: 15 days before and 15 days after the central date
+                            var start = new Date(currentDate.valueOf());
+                            start.setDate(start.getDate() - 15);
+                            var end = new Date(currentDate.valueOf());
+                            end.setDate(end.getDate() + 16);
+                            return { start: start, end: end };
+                        },
+                        
+                        // Trick to enable exact hours rendering in events while maintaining 1-day wide columns
+                        slotDuration: { hours: 24 }, 
+                        snapDuration: { hours: 1 },  
+                        
+                        slotLabelFormat: [
+                            { month: 'long', year: 'numeric' },
+                            { weekday: 'short', day: 'numeric' }
+                        ]
+                    }
+                },
+                
+                initialView: 'symmetricTimeline',
+                
+                headerToolbar: {
+                    left: 'customTodayButton', 
+                    center: 'title',
+                    right: '' 
+                },
+                
+                locale: 'pl',
+                displayEventTime: false, // Hides "14-12" text from event tiles
+                resourceAreaHeaderContent: 'Pokoje',
+                resourceAreaWidth: '15%',
+                stickyHeaderDates: true,
+                height: 'auto',
+
+                // Listener triggered whenever the calendar date changes
+                datesSet: function(info) {
+                    var centerDate = info.view.calendar.getDate();
+                    var year = centerDate.getFullYear();
+                    var month = String(centerDate.getMonth() + 1).padStart(2, '0');
+                    var day = String(centerDate.getDate()).padStart(2, '0');
+                    var dateString = year + '-' + month + '-' + day;
+
+                    var jumpDateInput = document.getElementById('jump-date');
+                    if (jumpDateInput) {
+                        jumpDateInput.value = dateString;
+                    }
+
+                    // Center the view on the newly selected date
+                    centerView(dateString);
+                },
+
+                // Injecting Django Context Data
+                resources: {{ resources_json|safe }},
+                events: {{ events_json|safe }}
+            });
+
+            calendar.render();
+
+            // Injecting the custom date picker into the right toolbar chunk
+            var rightToolbar = document.querySelector('.fc-toolbar-chunk:nth-child(3)');
+            if (rightToolbar && !document.getElementById('jump-date')) {
+                rightToolbar.innerHTML = '<input type="date" id="jump-date" title="Skocz do daty">';
+                
+                var jumpDateInput = document.getElementById('jump-date');
+                jumpDateInput.addEventListener('change', function() {
+                    if (this.value) {
+                        calendar.gotoDate(this.value);
+                    }
+                });
+            }
+        });
+    </script>
+
+</body>
+</html>
