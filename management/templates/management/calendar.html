@@ -36,6 +36,34 @@
             cursor: pointer;
             background-color: #fff;
         }
+        /* MODAL STYLES */
+        .modal-overlay {
+            display: none; 
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000; 
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 8px;
+            width: 400px;
+            max-width: 90%;
+            position: relative;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        .modal-close {
+            position: absolute;
+            top: 10px; right: 15px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #555;
+            font-weight: bold;
+        }
+        .modal-close:hover { color: #000; }
     </style>
 </head>
 <body>
@@ -44,6 +72,41 @@
     
     <div id='calendar'></div>
 
+    <div id="reservationModal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="modal-close" id="closeModalBtn">&times;</span>
+            <h3 id="modalGuestName" style="margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px;"></h3>
+            <p><strong>Status:</strong> <span id="modalStatus"></span></p>
+            <p><strong>Przyjazd:</strong> <span id="modalCheckIn"></span></p>
+            <p><strong>Wyjazd:</strong> <span id="modalCheckOut"></span></p>
+            
+            <p><strong>Numer Rezerwacji:</strong> <span id="modalResNumber"></span></p>
+            
+            <div style="text-align: right; margin-top: 20px;">
+                <button style="padding: 8px 15px; cursor: pointer; background-color: #007bff; color: white; border: none; border-radius: 4px;">Edytuj Rezerwację</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="newReservationModal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="modal-close" id="closeNewModalBtn">&times;</span>
+            <h3 style="margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 10px;">Nowa Rezerwacja</h3>
+            
+            <form id="newReservationForm">
+                <p><strong>Pokój ID:</strong> <input type="text" id="newRoomId" name="room_id" readonly style="border:none; background:transparent; font-weight:bold;"></p>
+                <p><strong>Przyjazd:</strong> <input type="date" id="newCheckIn" name="start_date" readonly style="border:none; background:transparent; font-weight:bold;"></p>
+                <p><strong>Wyjazd:</strong> <input type="date" id="newCheckOut" name="end_date" readonly style="border:none; background:transparent; font-weight:bold;"></p>
+                
+                <p style="color: #666; font-size: 14px;"><em>(Tutaj w kolejnym kroku dodamy pola dla gościa: Imię, Nazwisko, Cena itp.)</em></p>
+                
+                <div style="text-align: right; margin-top: 20px;">
+                    <button type="button" style="padding: 8px 15px; cursor: pointer; background-color: #28a745; color: white; border: none; border-radius: 4px;">Zapisz Rezerwację</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             var calendarEl = document.getElementById('calendar');
@@ -51,11 +114,9 @@
             // CUSTOM FUNCTION: Centers the horizontal scrollbar on a specific date
             function centerView(dateString) {
                 setTimeout(function() {
-                    // 1. Find the column header containing the date
                     var slot = document.querySelector('th[data-date^="' + dateString + '"]');
                     if (!slot) return;
                     
-                    // 2. Find the main FullCalendar horizontal scroller
                     var scrollers = document.querySelectorAll('.fc-scroller');
                     var mainScroller = null;
                     for (var i = 0; i < scrollers.length; i++) {
@@ -65,7 +126,6 @@
                         }
                     }
 
-                    // 3. Calculate the exact pixel position to center the column
                     if (mainScroller) {
                         var slotRect = slot.getBoundingClientRect();
                         var scrollerRect = mainScroller.getBoundingClientRect();
@@ -73,12 +133,10 @@
                         var offset = (slotRect.left - scrollerRect.left) + mainScroller.scrollLeft;
                         var centerPosition = offset - (scrollerRect.width / 2) + (slotRect.width / 2);
 
-                        // 4. Smoothly scroll to the calculated position
                         mainScroller.scrollTo({ left: centerPosition, behavior: 'smooth' });
                     }
-                }, 150); // Short delay to ensure calendar has fully rendered the columns
+                }, 150); 
             }
-
 
             var calendar = new FullCalendar.Calendar(calendarEl, {
                 // DEFINING CUSTOM BUTTONS
@@ -92,17 +150,36 @@
                             var day = String(today.getDate()).padStart(2, '0');
                             var dateString = year + '-' + month + '-' + day;
 
-                            // Force calendar to move to today's date
                             calendar.gotoDate(today);
 
-                            // Update the custom date picker input
                             var jumpDateInput = document.getElementById('jump-date');
                             if (jumpDateInput) {
                                 jumpDateInput.value = dateString;
                             }
 
-                            // Center the view on today's column
                             centerView(dateString);
+                        }
+                    },
+                    customPrevButton: {
+                        icon: 'chevron-left', 
+                        click: function() {
+                            var jumpInput = document.getElementById('jump-date');
+                            if (jumpInput && jumpInput.value) {
+                                var currentDate = new Date(jumpInput.value);
+                                currentDate.setDate(currentDate.getDate() - 7);
+                                calendar.gotoDate(currentDate);
+                            }
+                        }
+                    },
+                    customNextButton: {
+                        icon: 'chevron-right', 
+                        click: function() {
+                            var jumpInput = document.getElementById('jump-date');
+                            if (jumpInput && jumpInput.value) {
+                                var currentDate = new Date(jumpInput.value);
+                                currentDate.setDate(currentDate.getDate() + 7);
+                                calendar.gotoDate(currentDate);
+                            }
                         }
                     }
                 },
@@ -112,7 +189,6 @@
                     symmetricTimeline: {
                         type: 'resourceTimeline',
                         visibleRange: function(currentDate) {
-                            // Generate a symmetric range: 15 days before and 15 days after the central date
                             var start = new Date(currentDate.valueOf());
                             start.setDate(start.getDate() - 15);
                             var end = new Date(currentDate.valueOf());
@@ -120,9 +196,10 @@
                             return { start: start, end: end };
                         },
                         
-                        // Trick to enable exact hours rendering in events while maintaining 1-day wide columns
                         slotDuration: { hours: 24 }, 
                         snapDuration: { hours: 1 },  
+                        
+                        titleFormat: { year: 'numeric', month: 'short', day: 'numeric' },
                         
                         slotLabelFormat: [
                             { month: 'long', year: 'numeric' },
@@ -134,17 +211,52 @@
                 initialView: 'symmetricTimeline',
                 
                 headerToolbar: {
-                    left: 'customTodayButton', 
+                    left: 'customPrevButton,customNextButton customTodayButton', 
                     center: 'title',
                     right: '' 
                 },
                 
                 locale: 'pl',
-                displayEventTime: false, // Hides "14-12" text from event tiles
+                displayEventTime: false, 
                 resourceAreaHeaderContent: 'Pokoje',
                 resourceAreaWidth: '15%',
                 stickyHeaderDates: true,
                 height: 'auto',
+                
+                selectable: true, 
+                
+                // ACTION TRIGGERED AFTER DRAGGING AND SELECTING DATES
+                select: function(info) {
+                    var startDate = info.startStr.split('T')[0];
+                    var endDate = info.endStr.split('T')[0];
+                    var roomId = info.resource.id;
+
+                    // Populate the inputs in the new reservation modal
+                    document.getElementById('newRoomId').value = roomId;
+                    document.getElementById('newCheckIn').value = startDate;
+                    document.getElementById('newCheckOut').value = endDate;
+
+                    // Show the new reservation modal
+                    document.getElementById('newReservationModal').style.display = 'flex';
+                    
+                },
+
+                // ACTION TRIGGERED WHEN CLICKING AN EXISTING RESERVATION TILE
+                eventClick: function(info) {
+                    var props = info.event.extendedProps;
+                    
+                    // Populate modal fields with data from Django
+                    document.getElementById('modalGuestName').innerText = props.guest_name;
+                    document.getElementById('modalStatus').innerText = props.status;
+                    document.getElementById('modalCheckIn').innerText = props.check_in;
+                    document.getElementById('modalCheckOut').innerText = props.check_out;
+                    
+                    // CRITICAL FIX: Looking for exactly "modalResNumber"
+                    document.getElementById('modalResNumber').innerText = props.reservation_number;
+                    
+                    // Show the modal
+                    document.getElementById('reservationModal').style.display = 'flex';
+                },
 
                 // Listener triggered whenever the calendar date changes
                 datesSet: function(info) {
@@ -159,7 +271,6 @@
                         jumpDateInput.value = dateString;
                     }
 
-                    // Center the view on the newly selected date
                     centerView(dateString);
                 },
 
@@ -182,7 +293,31 @@
                     }
                 });
             }
-        });
+
+            // MODAL CLOSE LOGIC (Safely placed inside DOMContentLoaded)
+            document.getElementById('closeModalBtn').addEventListener('click', function() {
+                document.getElementById('reservationModal').style.display = 'none';
+            });
+
+            // Closing the new reservation modal
+            document.getElementById('closeNewModalBtn').addEventListener('click', function() {
+                document.getElementById('newReservationModal').style.display = 'none';
+            });
+
+            // Closing any modal by clicking on the dark overlay background
+            window.addEventListener('click', function(event) {
+                var detailsModal = document.getElementById('reservationModal');
+                var newModal = document.getElementById('newReservationModal');
+                
+                if (event.target == detailsModal) {
+                    detailsModal.style.display = 'none';
+                }
+                if (event.target == newModal) {
+                    newModal.style.display = 'none';
+                }
+            });
+
+        }); // END OF DOMContentLoaded
     </script>
 
 </body>

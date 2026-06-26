@@ -27,16 +27,24 @@ def calendar_view(request):
         events.append({
             'id': str(res.id),
             'resourceId': str(res.room.id),
-            'title': f"{res.contact_person.first_name} {res.contact_person.last_name}",
-            
-            # MAGIA: Doklejamy godzinę 14:00 do daty startu i 12:00 do daty końca (format ISO 8601)
+            'title': f"{res.contact_person.first_name} {res.contact_person.last_name}",          
             'start': res.start_date.strftime('%Y-%m-%d') + 'T14:00:00',
             'end': res.end_date.strftime('%Y-%m-%d') + 'T12:00:00',
-            
-            # Mówimy kalendarzowi, że to nie jest rezerwacja "całodniowa"
             'allDay': False, 
-            
             'backgroundColor': bg_color,
+
+            # PASSING EXTENDED PROPS TO THE FRONTEND MODAL
+            'extendedProps': {
+                # Using get_status_display() to show Polish labels (e.g., 'Gwarantowana')
+                'status': res.get_status_display(), 
+                'guest_name': f"{res.contact_person.first_name} {res.contact_person.last_name}",
+                'check_in': res.start_date.strftime('%Y-%m-%d'),
+                'check_out': res.end_date.strftime('%Y-%m-%d'),
+                
+                # Using the exact field name from models.py
+                'reservation_number': str(res.reservation_number)
+            }
+
         })
 
     context = {
